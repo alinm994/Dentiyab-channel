@@ -1,9 +1,12 @@
 # Sends the dentiyab.ir channel posts that are due (send.py). GitHub may start a timed run some minutes late; each
 # post stays on the site's list from its time until the next post's time, so a late run still sends it.
 name: send
+# Minutes off the round ten (GitHub's timed runs are busiest at :00/:10/…); the first push gave no timed run at all
+# for 7 hours (19 Nov 14:00–21:40Z, the 21:00 Tehran post was not sent), so this commit also registers the schedule
+# again.
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    - cron: '3,13,23,33,43,53 * * * *'
   workflow_dispatch:
     inputs:
       send_all:
