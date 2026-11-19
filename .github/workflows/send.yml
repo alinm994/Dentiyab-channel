@@ -1,0 +1,39 @@
+# Sends the dentiyab.ir channel posts that are due (send.py). GitHub may start a timed run some minutes late; each
+# post stays on the site's list from its time until the next post's time, so a late run still sends it.
+name: send
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+    inputs:
+      send_all:
+        description: 'Send every post of today not sent yet (catch-up)'
+        type: boolean
+        default: false
+permissions:
+  contents: write
+concurrency: send
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: What was already sent
+        run: |
+          git fetch --depth=1 origin sent && git show FETCH_HEAD:sent.json > "$RUNNER_TEMP/sent.json" || echo '[]' > "$RUNNER_TEMP/sent.json"
+          cp "$RUNNER_TEMP/sent.json" "$RUNNER_TEMP/sent.before.json"
+      - name: Send
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL: ${{ secrets.TELEGRAM_CHANNEL }}
+          SEND_ALL: ${{ inputs.send_all && '1' || '' }}
+        run: python3 send.py "$RUNNER_TEMP/sent.json"
+      - name: Keep the record
+        run: |
+          cmp -s "$RUNNER_TEMP/sent.json" "$RUNNER_TEMP/sent.before.json" && exit 0      # nothing new sent
+          cd "$RUNNER_TEMP" && rm -rf rec && mkdir rec && cd rec && git init -q
+          cp ../sent.json sent.json
+          git add sent.json
+          git -c user.name=channel-bot -c user.email=channel-bot@users.noreply.github.com commit -qm "sent $(date -u +%F)"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:sent
